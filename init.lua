@@ -171,6 +171,13 @@ require('lazy').setup({
       pcall(require('nvim-treesitter.install').update { with_sync = true })
     end,
   },
+  -- For the file icons
+  {
+    'nvim-tree/nvim-web-devicons'
+  },
+  {
+    'nvim-tree/nvim-tree.lua'
+  },
 
   -- NOTE: Next Step on Your Neovim Journey: Add/Configure additional "plugins" for kickstart
   --       These are some example plugins that I've included in the kickstart repository.
@@ -498,3 +505,104 @@ cmp.setup {
 require('kickstart.mappings')
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
+-- nvim-web-devicons
+require'nvim-web-devicons'.setup {
+ -- your personnal icons can go here (to override)
+ -- you can specify color or cterm_color instead of specifying both of them
+ -- DevIcon will be appended to `name`
+ override = {
+  zsh = {
+    icon = "",
+    color = "#428850",
+    cterm_color = "65",
+    name = "Zsh"
+  }
+ };
+ -- globally enable different highlight colors per icon (default to true)
+ -- if set to false all icons will have the default icon's color
+ color_icons = true;
+ -- globally enable default icons (default to false)
+ -- will get overriden by `get_icons` option
+ default = true;
+ -- globally enable "strict" selection of icons - icon will be looked up in
+ -- different tables, first by filename, and if not found by extension; this
+ -- prevents cases when file doesn't have any extension but still gets some icon
+ -- because its name happened to match some extension (default to false)
+ strict = true;
+ -- same as `override` but specifically for overrides by filename
+ -- takes effect when `strict` is true
+ override_by_filename = {
+  [".gitignore"] = {
+    icon = "",
+    color = "#f1502f",
+    name = "Gitignore"
+  }
+ };
+ -- same as `override` but specifically for overrides by extension
+ -- takes effect when `strict` is true
+ override_by_extension = {
+  ["log"] = {
+    icon = "",
+    color = "#81e043",
+    name = "Log"
+  }
+ };
+}
+-- nvim-tree
+require("nvim-tree").setup({
+  view = {
+    side= "right"
+  },
+      update_focused_file = {
+        enable = true,
+        update_root = false,
+        ignore_list = {},
+      },
+})
+local function open_nvim_tree()
+
+  -- open the tree
+  require("nvim-tree.api").tree.open()
+end
+vim.api.nvim_create_autocmd({ "VimEnter" }, { callback = open_nvim_tree })
+vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<cr>")
+vim.api.nvim_create_autocmd('BufEnter', {
+    command = "if winnr('$') == 1 && bufname() == 'NvimTree_' . tabpagenr() | quit | endif",
+    nested = true,
+})
+
+local function tab_win_closed(winnr)
+  local api = require"nvim-tree.api"
+  local tabnr = vim.api.nvim_win_get_tabpage(winnr)
+  local bufnr = vim.api.nvim_win_get_buf(winnr)
+  local buf_info = vim.fn.getbufinfo(bufnr)[1]
+  local tab_wins = vim.tbl_filter(function(w) return w~=winnr end, vim.api.nvim_tabpage_list_wins(tabnr))
+  local tab_bufs = vim.tbl_map(vim.api.nvim_win_get_buf, tab_wins)
+  if buf_info.name:match(".*NvimTree_%d*$") then            -- close buffer was nvim tree
+    -- Close all nvim tree on :q
+    if not vim.tbl_isempty(tab_bufs) then                      -- and was not the last window (not closed automatically by code below)
+      api.tree.close()
+    end
+  else                                                      -- else closed buffer was normal buffer
+    if #tab_bufs == 1 then                                    -- if there is only 1 buffer left in the tab
+      local last_buf_info = vim.fn.getbufinfo(tab_bufs[1])[1]
+      if last_buf_info.name:match(".*NvimTree_%d*$") then       -- and that buffer is nvim tree
+        vim.schedule(function ()
+          if #vim.api.nvim_list_wins() == 1 then                -- if its the last buffer in vim
+            vim.cmd "quit"                                        -- then close all of vim
+          else                                                  -- else there are more tabs open
+            vim.api.nvim_win_close(tab_wins[1], true)             -- then close only the tab
+          end
+        end)
+      end
+    end
+  end
+end
+
+vim.api.nvim_create_autocmd("WinClosed", {
+  callback = function ()
+    local winnr = tonumber(vim.fn.expand("<amatch>"))
+    vim.schedule_wrap(tab_win_closed(winnr))
+  end,
+  nested = true
+})

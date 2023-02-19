@@ -31,7 +31,7 @@ keymap.set('n', 'te', ':tabedit')
 keymap.set('n', '<C-w>-', ':split<Return><C-w>w')
 keymap.set('n', '<C-w>|', ':vsplit<Return><C-w>w')
 -- Move between windows
-keymap.set('n', '<Space>', '<C-w>w')
+-- keymap.set('n', '<Space>', '<C-w>w')
 
 -- Resize window
 keymap.set('n', '<C-w><left>', '<C-w><')
