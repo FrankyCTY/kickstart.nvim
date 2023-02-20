@@ -4,7 +4,7 @@ if (not status) then
   return
 end
 
-dashboard.setup {
+dashboard.setup({
    theme = 'hyper',
     config = {
       week_header = {
@@ -34,4 +34,4 @@ dashboard.setup {
         },
       },
     },
-}
+})
