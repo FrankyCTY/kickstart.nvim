@@ -112,12 +112,15 @@ require('lazy').setup({
     },
   },
 
-  { -- Theme inspired by Atom
-    'navarasu/onedark.nvim',
-    priority = 1000,
-    config = function()
-      vim.cmd.colorscheme 'onedark'
-    end,
+  -- { -- Theme inspired by Atom
+  --   'navarasu/onedark.nvim',
+  --   priority = 1000,
+  --   config = function()
+  --     vim.cmd.colorscheme 'onedark'
+  --   end,
+  -- },
+  {
+   'folke/tokyonight.nvim'
   },
 
   { -- Set lualine as statusline
@@ -176,13 +179,16 @@ require('lazy').setup({
     'nvim-tree/nvim-web-devicons'
   },
   {
-    'nvim-tree/nvim-tree.lua'
+    'jose-elias-alvarez/null-ls.nvim'
+  },
+  {
+    'MunifTanjim/prettier.nvim'
   },
   -- NOTE: Next Step on Your Neovim Journey: Add/Configure additional "plugins" for kickstart
   --       These are some example plugins that I've included in the kickstart repository.
   --       Uncomment any of the lines below to enable them.
   -- require 'kickstart.plugins.autoformat',
-  -- require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.debug',
 
   -- NOTE: The import below automatically adds your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    You can use this folder to prevent any conflicts with this init.lua if you're interested in keeping
@@ -203,6 +209,9 @@ vim.o.hlsearch = false
 
 -- Make line numbers default
 vim.wo.number = true
+
+-- Enable relative line number
+vim.o.relativenumber = false
 
 -- Enable mouse mode
 vim.o.mouse = 'a'
@@ -261,6 +270,7 @@ vim.api.nvim_create_autocmd('TextYankPost', {
 -- See `:help telescope` and `:help telescope.setup()`
 require('telescope').setup {
   defaults = {
+    -- file_ignore_patterns = '^.git/node_modules',
     mappings = {
       i = {
         ['<C-u>'] = false,
@@ -284,7 +294,7 @@ vim.keymap.set('n', '<C-f>', function()
   })
 end, { desc = '[/] Fuzzily search in current buffer' })
 
-vim.keymap.set('n', '<C-p>', require('telescope.builtin').find_files, { desc = '[S]earch [F]iles' })
+vim.keymap.set('n', '<C-p>', function() return require('telescope.builtin').find_files({hidden = true, no_ignore = false, no_ignore_parent = false}) end, { desc = '[S]earch [F]iles (Include hidden files)' })
 vim.keymap.set('n', '<leader>sh', require('telescope.builtin').help_tags, { desc = '[S]earch [H]elp' })
 vim.keymap.set('n', '<leader>sw', require('telescope.builtin').grep_string, { desc = '[S]earch current [W]ord' })
 vim.keymap.set('n', '<leader>sg', require('telescope.builtin').live_grep, { desc = '[S]earch by [G]rep' })
@@ -427,6 +437,9 @@ local servers = {
   },
 }
 
+vim.o.updatetime = 250
+vim.cmd [[autocmd! CursorHold,CursorHoldI * lua vim.diagnostic.open_float(nil, {focus=false})]]
+
 -- Setup neovim lua configuration
 require('neodev').setup()
 
@@ -547,123 +560,160 @@ require'nvim-web-devicons'.setup {
   }
  };
 }
--- nvim-tree
-require("nvim-tree").setup({
-  view = {
-    side= "right"
+
+
+-- Format on save
+local group = vim.api.nvim_create_augroup("lsp_format_on_save", { clear = false })
+local event = "BufWritePre" -- or "BufWritePost"
+local async = event == "BufWritePost"
+
+-- Prettier
+local status, prettier = pcall(require, 'prettier')
+if (not status) then return end
+
+prettier.setup {
+  bin = 'prettierd',
+  filetypes= {
+    'css',
+    'javascript',
+    'markdown',
+    'typescript',
+    'json',
+    'scss'
+  }
+}
+
+-- Null ls
+local lsp_formatting = function(bufnr)
+    vim.lsp.buf.format({
+        filter = function(client)
+            -- apply whatever logic you want (in this example, we'll only use null-ls)
+            return client.name == "null-ls"
+        end,
+        bufnr = bufnr,
+    })
+end
+
+-- if you want to set up formatting on save, you can use this as a callback
+local augroup = vim.api.nvim_create_augroup("LspFormatting", {})
+
+-- add to your shared on_attach callback
+local on_attach = function(client, bufnr)
+    if client.supports_method("textDocument/formatting") then
+        vim.api.nvim_clear_autocmds({ group = augroup, buffer = bufnr })
+        vim.api.nvim_create_autocmd("BufWritePre", {
+            group = augroup,
+            buffer = bufnr,
+            callback = function()
+                lsp_formatting(bufnr)
+            end,
+        })
+    end
+end
+
+local augroup = vim.api.nvim_create_augroup("LspFormatting", {})
+require("null-ls").setup({
+    -- you can reuse a shared lspconfig on_attach callback here
+    on_attach = function(client, bufnr)
+        if client.supports_method("textDocument/formatting") then
+            vim.api.nvim_clear_autocmds({ group = augroup, buffer = bufnr })
+            vim.api.nvim_create_autocmd("BufWritePre", {
+                group = augroup,
+                buffer = bufnr,
+                callback = function()
+                    -- on 0.8, you should use vim.lsp.buf.format({ bufnr = bufnr }) instead
+                    vim.lsp.buf.format({ bufnr = bufnr }) 
+                end,
+            })
+        end
+    end,
+})
+
+local prettier = require("prettier")
+
+prettier.setup({
+  bin = 'prettier', -- or `'prettierd'` (v0.22+)
+  filetypes = {
+    "css",
+    "graphql",
+    "html",
+    "javascript",
+    "javascriptreact",
+    "json",
+    "less",
+    "markdown",
+    "scss",
+    "typescript",
+    "typescriptreact",
+    "yaml",
   },
-      update_focused_file = {
-        enable = true,
-        update_root = false,
-        ignore_list = {},
-      },
-renderer = {
-        add_trailing = false,
-        group_empty = false,
-        highlight_git = false,
-        full_name = false,
-        highlight_opened_files = "none",
-        highlight_modified = "none",
-        root_folder_label = ":~:s?$?/..?",
-        indent_width = 2,
-        indent_markers = {
-          enable = false,
-          inline_arrows = true,
-          icons = {
-            corner = "└",
-            edge = "│",
-            item = "│",
-            bottom = "─",
-            none = " ",
-          },
-        },
-        icons = {
-          webdev_colors = true,
-          git_placement = "before",
-          modified_placement = "after",
-          padding = " ",
-          symlink_arrow = " ➛ ",
-          show = {
-            file = true,
-            folder = true,
-            folder_arrow = true,
-            git = true,
-            modified = true,
-          },
-          glyphs = {
-            default = "",
-            symlink = "",
-            bookmark = "",
-            modified = "●",
-            folder = {
-              arrow_closed = ">",
-              arrow_open = "",
-              default = "",
-              open = "",
-              empty = "",
-              empty_open = "",
-              symlink = "",
-              symlink_open = "",
-            },
-            git = {
-              unstaged = "✗",
-              staged = "✓",
-              unmerged = "",
-              renamed = "➜",
-              untracked = "★",
-              deleted = "",
-              ignored = "◌",
-            },
-          },
-        },
-        special_files = { "Cargo.toml", "Makefile", "README.md", "readme.md" },
-        symlink_destination = true,
-      },
-})
-local function open_nvim_tree()
-
-  -- open the tree
-  require("nvim-tree.api").tree.open()
-end
-vim.api.nvim_create_autocmd({ "VimEnter" }, { callback = open_nvim_tree })
-vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<cr>")
-vim.api.nvim_create_autocmd('BufEnter', {
-    command = "if winnr('$') == 1 && bufname() == 'NvimTree_' . tabpagenr() | quit | endif",
-    nested = true,
 })
 
-local function tab_win_closed(winnr)
-  local api = require"nvim-tree.api"
-  local tabnr = vim.api.nvim_win_get_tabpage(winnr)
-  local bufnr = vim.api.nvim_win_get_buf(winnr)
-  local buf_info = vim.fn.getbufinfo(bufnr)[1]
-  local tab_wins = vim.tbl_filter(function(w) return w~=winnr end, vim.api.nvim_tabpage_list_wins(tabnr))
-  local tab_bufs = vim.tbl_map(vim.api.nvim_win_get_buf, tab_wins)
-  if buf_info.name:match(".*NvimTree_%d*$") then            -- close buffer was nvim tree
-    -- Close all nvim tree on :q
-    if not vim.tbl_isempty(tab_bufs) then                      -- and was not the last window (not closed automatically by code below)
-      api.tree.close()
-    end
-  else                                                      -- else closed buffer was normal buffer
-    if #tab_bufs == 1 then                                    -- if there is only 1 buffer left in the tab
-      local last_buf_info = vim.fn.getbufinfo(tab_bufs[1])[1]
-      if last_buf_info.name:match(".*NvimTree_%d*$") then       -- and that buffer is nvim tree
-        vim.schedule(function ()
-          if #vim.api.nvim_list_wins() == 1 then                -- if its the last buffer in vim
-            vim.cmd "quit"                                        -- then close all of vim
-          else                                                  -- else there are more tabs open
-            vim.api.nvim_win_close(tab_wins[1], true)             -- then close only the tab
-          end
-        end)
-      end
-    end
-  end
-end
+-- Theme
+vim.cmd.colorscheme 'tokyonight-storm'
+require("tokyonight").setup({
+  -- your configuration comes here
+  -- or leave it empty to use the default settings
+  style = "storm", -- The theme comes in three styles, `storm`, `moon`, a darker variant `night` and `day`
+  light_style = "day", -- The theme is used when the background is set to light
+  transparent = true, -- Enable this to disable setting the background color
+  terminal_colors = true, -- Configure the colors used when opening a `:terminal` in Neovim
+  styles = {
+    -- Style to be applied to different syntax groups
+    -- Value is any valid attr-list value for `:help nvim_set_hl`
+    comments = { italic = true },
+    keywords = { italic = true },
+    functions = {},
+    variables = {},
+    -- Background styles. Can be "dark", "transparent" or "normal"
+    sidebars = "dark", -- style for sidebars, see below
+    floats = "dark", -- style for floating windows
+  },
+  sidebars = { "qf", "help" }, -- Set a darker background on sidebar-like windows. For example: `["qf", "vista_kind", "terminal", "packer"]`
+  day_brightness = 0.1, -- Adjusts the brightness of the colors of the **Day** style. Number between 0 and 1, from dull to vibrant colors
+  hide_inactive_statusline = false, -- Enabling this option, will hide inactive statuslines and replace them with a thin border instead. Should work with the standard **StatusLine** and **LuaLine**.
+  dim_inactive = false, -- dims inactive windows
+  lualine_bold = false, -- When `true`, section headers in the lualine theme will be bold
 
-vim.api.nvim_create_autocmd("WinClosed", {
-  callback = function ()
-    local winnr = tonumber(vim.fn.expand("<amatch>"))
-    vim.schedule_wrap(tab_win_closed(winnr))
+  --- You can override specific color groups to use other groups or a hex color
+  --- function will be called with a ColorScheme table
+  ---@param colors ColorScheme
+  on_colors = function(colors) end,
+
+  --- You can override specific highlights to use other groups or a hex color
+  --- function will be called with a Highlights and ColorScheme table
+  ---@param highlights Highlights
+  ---@param colors ColorScheme
+--  on_highlights = function(highlights, colors) end,
+ on_highlights = function(hl, c)
+    local prompt = "#2d3149"
+    hl.TelescopeNormal = {
+      bg = c.bg_dark,
+      fg = c.fg_dark,
+    }
+    hl.TelescopeBorder = {
+      bg = c.bg_dark,
+      fg = c.bg_dark,
+    }
+    hl.TelescopePromptNormal = {
+      bg = prompt,
+    }
+    hl.TelescopePromptBorder = {
+      bg = prompt,
+      fg = prompt,
+    }
+    hl.TelescopePromptTitle = {
+      bg = prompt,
+      fg = prompt,
+    }
+    hl.TelescopePreviewTitle = {
+      bg = c.bg_dark,
+      fg = c.bg_dark,
+    }
+    hl.TelescopeResultsTitle = {
+      bg = c.bg_dark,
+      fg = c.bg_dark,
+    }
   end,
-  nested = true
 })
+
