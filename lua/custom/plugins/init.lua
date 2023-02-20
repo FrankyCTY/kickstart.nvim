@@ -7,4 +7,17 @@ return {
     version = "*",
     dependencies = {"nvim-tree/nvim-web-devicons" -- not strictly required, but recommended
     },
+  {
+   'folke/tokyonight.nvim'
+  },
+  -- For the file icons
+  {
+    'nvim-tree/nvim-web-devicons'
+  },
+  {
+    'jose-elias-alvarez/null-ls.nvim'
+  },
+  {
+    'MunifTanjim/prettier.nvim'
+  },
 }
