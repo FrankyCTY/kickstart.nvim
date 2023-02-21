@@ -4,10 +4,6 @@ if (not status) then
   return
 end
 
-telescope.setup({  defaults = {
-    -- ...
-  },
-  pickers = {},
-  extensions = {
-    -- ...
-  }})
+-- [[ Configure Telescope ]]
+-- See `:help telescope` and `:help telescope.setup()`
+-- Please refer to the main init.lua
